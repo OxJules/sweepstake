@@ -1,0 +1,70 @@
+{
+  "drawn_at": "2026-06-12T15:21:29+00:00",
+  "seed": null,
+  "shared_bottom_team": "Cape Verde",
+  "allocation": {
+    "Julian": [
+      "France",
+      "Germany",
+      "Uruguay",
+      "Algeria",
+      "Sweden",
+      "Paraguay",
+      "Haiti"
+    ],
+    "Bawar": [
+      "Brazil",
+      "Senegal",
+      "Austria",
+      "Egypt",
+      "Turkey",
+      "Uzbekistan",
+      "Jordan"
+    ],
+    "Joseph": [
+      "Argentina",
+      "Belgium",
+      "Switzerland",
+      "Qatar",
+      "Czechia",
+      "Panama",
+      "New Zealand"
+    ],
+    "Sophie": [
+      "England",
+      "Croatia",
+      "Iran",
+      "Ivory Coast",
+      "Tunisia",
+      "South Africa",
+      "Cape Verde"
+    ],
+    "Sumit": [
+      "Portugal",
+      "Colombia",
+      "Ecuador",
+      "South Korea",
+      "Norway",
+      "Saudi Arabia",
+      "Cape Verde"
+    ],
+    "Aditya": [
+      "Spain",
+      "Mexico",
+      "United States",
+      "Canada",
+      "DR Congo",
+      "Bosnia & Herzegovina",
+      "Curacao"
+    ],
+    "Lukasz": [
+      "Netherlands",
+      "Morocco",
+      "Japan",
+      "Australia",
+      "Scotland",
+      "Iraq",
+      "Ghana"
+    ]
+  }
+}

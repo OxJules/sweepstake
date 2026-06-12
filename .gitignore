@@ -1,0 +1,13 @@
+# Local Claude Code settings — not for the repo
+.claude/
+
+# Original zip extraction + validation scratch
+extracted/
+_validate/
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets must never be committed (the script reads these from env vars)
+.env
