@@ -75,6 +75,9 @@ SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 
 ALLOCATION_FILE = "allocation.json"
 TABLE_HTML = "table.html"
+# Snapshot of the previous run's ranking, used to show movement (▲/▼) since the
+# last update. Auto-written each run and committed back by the daily workflow.
+STATE_FILE = "standings_state.json"
 
 # ===========================================================================
 # THE 48 TEAMS  --  ordered into 7 tiers by FIFA ranking (April 2026 update)
@@ -296,29 +299,62 @@ def compute_team_points(matches):
     return pts, stats, unmatched
 
 
-def build_standings(alloc, team_pts):
+def build_standings(alloc, team_pts, team_stats):
     rows = []
     for person, teams in alloc.items():
         breakdown = [(t, team_pts.get(t, 0)) for t in teams]
+        played = gf = ga = 0
+        for t in teams:
+            s = team_stats.get(t)
+            if s:
+                played += s["P"]; gf += s["GF"]; ga += s["GA"]
         rows.append({
             "person": person,
             "total": sum(p for _, p in breakdown),
+            "played": played, "gf": gf, "ga": ga, "gd": gf - ga,
             "teams": breakdown,
         })
-    rows.sort(key=lambda r: (-r["total"], r["person"]))
+    # Rank by points, then goal difference, then goals for, then name.
+    rows.sort(key=lambda r: (-r["total"], -r["gd"], -r["gf"], r["person"]))
     return rows
+
+
+def load_prev_ranks():
+    """Return {person: rank} from the previous run, or {} if none/unreadable."""
+    if not os.path.exists(STATE_FILE):
+        return {}
+    try:
+        with open(STATE_FILE, encoding="utf-8") as f:
+            return (json.load(f) or {}).get("ranks", {})
+    except (ValueError, OSError):
+        return {}
+
+
+def save_ranks(rows, updated):
+    ranks = {r["person"]: r["rank"] for r in rows}
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"updated": updated, "ranks": ranks}, f, indent=2)
 
 
 # ===========================================================================
 # Output: Telegram text + HTML table
 # ===========================================================================
 
+def move_arrow(move):
+    """Text arrow for a rank change: up = improved, down = dropped."""
+    if not move:            # None or 0
+        return ""
+    return "  ▲%d" % move if move > 0 else "  ▼%d" % (-move)
+
+
 def standings_text(rows, updated):
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
     lines = ["🏆 World Cup Sweepstake", "Updated %s UTC" % updated, ""]
     for i, r in enumerate(rows, 1):
         tag = medals.get(i, "%d." % i)
-        lines.append("%s %s — %d pts" % (tag, r["person"], r["total"]))
+        lines.append("%s %s — %d pts  (P%d, GD%+d)%s"
+                     % (tag, r["person"], r["total"], r["played"],
+                        r["gd"], move_arrow(r.get("move"))))
     return "\n".join(lines)
 
 
@@ -360,12 +396,23 @@ def build_html(rows, updated, source, shared, total_matches):
         return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
     medals = {1: "🥇", 2: "🥈", 3: "🥉"}
 
+    def move_cell(move):
+        if not move:        # None (first run) or 0
+            return "<span class='flat'>–</span>"
+        if move > 0:
+            return "<span class='up'>&#9650;%d</span>" % move
+        return "<span class='down'>&#9660;%d</span>" % (-move)
+
     main_rows = []
     for i, r in enumerate(rows, 1):
         rank = medals.get(i, str(i))
         main_rows.append(
             "<tr><td class='rank'>%s</td><td class='who'>%s</td>"
-            "<td class='pts'>%d</td></tr>" % (rank, esc(r["person"]), r["total"]))
+            "<td class='num'>%d</td><td class='num'>%d</td><td class='num'>%d</td>"
+            "<td class='num gd'>%+d</td><td class='pts'>%d</td>"
+            "<td class='mv'>%s</td></tr>"
+            % (rank, esc(r["person"]), r["played"], r["gf"], r["ga"],
+               r["gd"], r["total"], move_cell(r.get("move"))))
 
     cards = []
     for i, r in enumerate(rows, 1):
@@ -398,14 +445,22 @@ def build_html(rows, updated, source, shared, total_matches):
   .sub{color:var(--mut);font-size:13px;margin-bottom:22px}
   table{width:100%%;border-collapse:collapse;background:var(--card);
     border:1px solid var(--line);border-radius:14px;overflow:hidden}
-  th,td{padding:13px 16px;text-align:left}
+  th,td{padding:12px 11px;text-align:left}
   th{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);
     border-bottom:1px solid var(--line)}
   tbody tr+tr td{border-top:1px solid var(--line)}
   td.rank{width:54px;font-size:18px;font-weight:700;color:var(--gold)}
   td.who{font-weight:600}
   td.pts{text-align:right;font-weight:800;font-size:18px;color:var(--acc)}
+  td.num{text-align:center;color:var(--mut);
+    font-variant-numeric:tabular-nums}
+  td.num.gd{color:var(--ink)}
+  td.mv{text-align:center;font-weight:700;font-size:13px}
   th.r{text-align:right}
+  th.c{text-align:center}
+  .up{color:#37d3a6}
+  .down{color:#ff6b6b}
+  .flat{color:var(--mut)}
   h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);
     margin:30px 0 12px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
@@ -427,13 +482,17 @@ def build_html(rows, updated, source, shared, total_matches):
   <h1>🏆 World Cup Sweepstake</h1>
   <div class="sub">Updated %(updated)s UTC &middot; %(matches)d matches counted &middot; source: %(source)s</div>
   <table>
-    <thead><tr><th>#</th><th>Player</th><th class="r">Points</th></tr></thead>
+    <thead><tr><th>#</th><th>Player</th><th class="c">P</th><th class="c">GF</th>
+      <th class="c">GA</th><th class="c">GD</th><th class="r">Pts</th>
+      <th class="c">+/&minus;</th></tr></thead>
     <tbody>%(rows)s</tbody>
   </table>
   <h2>Breakdown by player</h2>
   %(cards)s
-  <div class="foot">Win 3 &middot; Draw 1 &middot; Loss 0. ★ marks the shared bottom-tier
-  team (<b>%(shared)s</b>), held by two players. Page refreshes every 10 minutes.</div>
+  <div class="foot">Win 3 &middot; Draw 1 &middot; Loss 0. Ranked by points, then goal
+  difference. <span class="up">&#9650;</span>/<span class="down">&#9660;</span> show places
+  gained or lost since the last update. ★ marks the shared bottom-tier team
+  (<b>%(shared)s</b>), held by two players. Page refreshes every 10 minutes.</div>
 </div></body></html>""" % {
         "updated": esc(updated), "matches": total_matches, "source": esc(source),
         "rows": "".join(main_rows), "cards": "".join(cards), "shared": esc(shared),
@@ -453,18 +512,27 @@ def do_update(post=True):
     shared = saved.get("shared_bottom_team", "")
 
     matches, source = get_results()
-    team_pts, _stats, unmatched = compute_team_points(matches)
+    team_pts, stats, unmatched = compute_team_points(matches)
     if unmatched:
         print("WARNING: these result names did not match any team (add them as "
               "aliases in TIERS): %s" % ", ".join(sorted(unmatched)))
 
-    rows = build_standings(alloc, team_pts)
+    prev_ranks = load_prev_ranks()
+    rows = build_standings(alloc, team_pts, stats)
+    for i, r in enumerate(rows, 1):
+        r["rank"] = i
+        prev = prev_ranks.get(r["person"])
+        # Positive = climbed (lower rank number is better); None on first run.
+        r["move"] = (prev - i) if prev is not None else None
+
     updated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
     html = build_html(rows, updated, source, shared, len(matches))
     with open(TABLE_HTML, "w", encoding="utf-8") as f:
         f.write(html)
     print("Wrote %s" % TABLE_HTML)
+
+    save_ranks(rows, updated)
 
     text = standings_text(rows, updated)
     print("\n" + text + "\n")
