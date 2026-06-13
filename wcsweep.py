@@ -66,6 +66,13 @@ RESULTS_CSV = "results.csv"
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
+# --- Slack (optional) -------------------------------------------------------
+# A Slack "Incoming Webhook" URL. Create one at https://api.slack.com/apps ->
+# your app -> Incoming Webhooks -> Add New Webhook to Workspace -> pick a
+# channel; it gives you a https://hooks.slack.com/services/... URL. Put it in
+# the SLACK_WEBHOOK_URL environment variable. No bot user or token needed.
+SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
+
 ALLOCATION_FILE = "allocation.json"
 TABLE_HTML = "table.html"
 
@@ -333,6 +340,21 @@ def send_telegram(text):
         print("Telegram post failed: %s" % e)
 
 
+def send_slack(text):
+    if not SLACK_WEBHOOK_URL:
+        return
+    payload = json.dumps({"text": text}).encode("utf-8")
+    req = urllib.request.Request(
+        SLACK_WEBHOOK_URL, data=payload,
+        headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            r.read()
+        print("Posted table to Slack.")
+    except urllib.error.URLError as e:
+        print("Slack post failed: %s" % e)
+
+
 def build_html(rows, updated, source, shared, total_matches):
     def esc(s):
         return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
@@ -448,6 +470,7 @@ def do_update(post=True):
     print("\n" + text + "\n")
     if post:
         send_telegram(text)
+        send_slack(text)
 
 
 # ===========================================================================

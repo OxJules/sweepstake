@@ -61,6 +61,21 @@ match on each run, so re-running never double-counts.
    ```
    If these aren't set, the script just skips posting.
 
+## Slack (optional)
+
+Simpler than a Telegram bot — no bot user, no chat id.
+
+1. Go to **https://api.slack.com/apps** → **Create New App** → *From scratch* →
+   name it, pick your workspace.
+2. In the app, open **Incoming Webhooks** → toggle **On** → **Add New Webhook to
+   Workspace** → choose the channel to post in.
+3. Copy the webhook URL (`https://hooks.slack.com/services/...`) and set it:
+   ```
+   export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+   ```
+   If it isn't set, the script just skips Slack. Telegram and Slack can both be
+   on at once; each is posted only if configured.
+
 ## Running it automatically every day
 
 ### Option A — GitHub Actions (free, no server)
