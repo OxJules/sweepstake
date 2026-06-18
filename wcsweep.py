@@ -41,10 +41,19 @@ DRAW_POINTS = 1
 LOSS_POINTS = 0
 
 # Knockout games that finish level and are decided on penalties:
-#   False -> counted as a DRAW for both teams (1 pt each)   [default]
-#   True  -> the shootout winner gets a WIN, the loser a LOSS
-# (Irrelevant during the group stage, which can never end on penalties.)
-PENALTY_WINNER_GETS_WIN = False
+#   True  -> the shootout winner gets a WIN (3), the loser a LOSS (0)   [in use]
+#   False -> counted as a DRAW for both teams (1 pt each)
+# Set True for this sweepstake: from the knockout stage on, the match winner
+# takes 3 and the loser 0 even when it's decided on penalties. (Group games can
+# never end level-then-decided, so this never affects them.)
+PENALTY_WINNER_GETS_WIN = True
+
+# The third-place play-off is discounted (not counted at all). Otherwise the team
+# that finishes 3rd could earn 3 points for winning it while the runner-up earns
+# 0 for losing the final, letting 3rd out-score 2nd. football-data.org tags this
+# match with the stage "THIRD_PLACE".
+DISCOUNT_THIRD_PLACE = True
+THIRD_PLACE_STAGE = "THIRD_PLACE"
 
 # Fix the draw for auditability: set an integer so the exact same draw can be
 # reproduced and verified by anyone. Leave None for a genuinely random draw.
@@ -231,6 +240,7 @@ def fetch_results_api():
             "winner": (m.get("score") or {}).get("winner"),  # HOME_TEAM/AWAY_TEAM/DRAW
             "decision": "",
             "date": (m.get("utcDate") or "")[:10],
+            "stage": m.get("stage") or "",
         })
     return out
 
@@ -251,6 +261,7 @@ def fetch_results_csv():
                 "winner": None,
                 "decision": (row.get("decision") or "").strip().upper(),
                 "date": (row.get("date") or "").strip(),
+                "stage": (row.get("stage") or "").strip(),
             })
     return out
 
@@ -512,6 +523,13 @@ def do_update(post=True):
     shared = saved.get("shared_bottom_team", "")
 
     matches, source = get_results()
+    if DISCOUNT_THIRD_PLACE:
+        before = len(matches)
+        matches = [m for m in matches
+                   if (m.get("stage") or "").strip().upper() != THIRD_PLACE_STAGE]
+        dropped = before - len(matches)
+        if dropped:
+            print("Discounted %d third-place play-off match(es)." % dropped)
     team_pts, stats, unmatched = compute_team_points(matches)
     if unmatched:
         print("WARNING: these result names did not match any team (add them as "

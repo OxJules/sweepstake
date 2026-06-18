@@ -18,6 +18,14 @@ to Telegram.
 Scoring: **Win 3, Draw 1, Loss 0**. The table is rebuilt from every finished
 match on each run, so re-running never double-counts.
 
+Knockout rules (from the round of 32 on):
+- A match **decided on penalties** counts as a win (3) for the winner and a loss
+  (0) for the loser, not a draw (`PENALTY_WINNER_GETS_WIN = True`).
+- The **third-place play-off is discounted** — it isn't counted at all
+  (`DISCOUNT_THIRD_PLACE = True`). Otherwise the team finishing 3rd could bank 3
+  points for winning it while the beaten finalist (2nd) gets 0 for losing the
+  final, letting 3rd out-score 2nd.
+
 ## One-time setup
 
 1. **Edit `wcsweep.py`** — put your 7 names in `PEOPLE` near the top.
@@ -34,10 +42,12 @@ match on each run, so re-running never double-counts.
      ```
    - **Manual** — leave the token unset and fill in `results.csv`:
      ```
-     date,home,away,home_goals,away_goals,decision
-     2026-06-11,Mexico,South Africa,2,1,
+     date,home,away,home_goals,away_goals,decision,stage
+     2026-06-11,Mexico,South Africa,2,1,,GROUP_STAGE
      ```
-     (`decision` is only for knockout penalty shootouts: `HOME` or `AWAY`.)
+     (`decision` is only for knockout penalty shootouts: `HOME` or `AWAY`.
+     `stage` is optional; set it to `THIRD_PLACE` on the third-place play-off so
+     that match is discounted. Both columns can be omitted entirely.)
 
 4. **Update the table:**
    ```
@@ -101,6 +111,9 @@ Simpler than a Telegram bot — no bot user, no chat id.
   result ever logs a name it can't match, `update` prints a `WARNING` naming it —
   add that spelling to the team's alias list in `TIERS` and re-run.
 - **Penalty shootouts:** group-stage games can't be drawn-then-decided, so they
-  are exact. For knockout games that go to penalties, the default counts them as
-  a draw (1 pt each). Set `PENALTY_WINNER_GETS_WIN = True` to instead award the
-  shootout winner a win.
+  are exact. Knockout games that go to penalties award the winner a win (3) and
+  the loser a loss (0) — `PENALTY_WINNER_GETS_WIN = True`. Set it back to `False`
+  to count them as a draw (1 pt each) instead.
+- **Third-place play-off:** discounted by default (`DISCOUNT_THIRD_PLACE = True`)
+  so 3rd can't out-score 2nd. The match is identified by football-data.org's
+  `THIRD_PLACE` stage; set `DISCOUNT_THIRD_PLACE = False` to count it normally.
