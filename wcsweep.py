@@ -111,7 +111,7 @@ TIERS = [
      ("Panama", []), ("Saudi Arabia", []), ("South Africa", []),
      ("Iraq", []), ("Uzbekistan", []), ("Paraguay", [])],
     # Tier 7  (bottom, FIFA 65-95) -- 6 teams; one is allocated to two people
-    [("Ghana", []), ("Jordan", []), ("Cape Verde", ["Cabo Verde"]),
+    [("Ghana", []), ("Jordan", []), ("Cape Verde", ["Cabo Verde", "Cape Verde Islands"]),
      ("Curacao", ["Curaçao"]), ("Haiti", []), ("New Zealand", [])],
 ]
 
